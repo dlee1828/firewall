@@ -12,9 +12,14 @@
 
 void read_config(void) {
     struct file* file = filp_open("/.firewallconfig", O_RDONLY, 0);
-    char buf[100];
-    kernel_read(file, buf, 100, NULL);
-    pr_info("%s\n", buf);
+    if (IS_ERR(file)) {
+        pr_info("%d\n", PTR_ERR(file));
+    }
+    else {
+        char buf[100];
+        kernel_read(file, buf, 100, NULL);
+        pr_info("%s\n", buf);
+    }
 }
 
 void pkt_hex_dump(struct sk_buff *skb)

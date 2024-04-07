@@ -11,7 +11,7 @@
 #include <linux/udp.h>
 
 void read_config(void) {
-    struct file* file = filp_open("/test.txt", O_RDONLY, 0);
+    struct file* file = filp_open("/.firewallconfig", O_RDONLY, 0);
     char buf[100];
     kernel_read(file, buf, 100, NULL);
     pr_info("%s\n", buf);

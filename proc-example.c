@@ -30,7 +30,7 @@ static ssize_t procfile_read(struct file *file_pointer, char __user *buffer,
         pr_info("procfile read %s\n", file_pointer->f_path.dentry->d_name.name); 
         *offset += len; 
     } 
- 
+
     return ret; 
 } 
  

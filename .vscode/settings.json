@@ -33,6 +33,15 @@
         "inet.h": "c",
         "tcp.h": "c",
         "stdio.h": "c",
-        "string.h": "c"
+        "string.h": "c",
+        "atomic": "c",
+        "fstream": "c",
+        "sstream": "c",
+        "*.inc": "c",
+        "slab.h": "c",
+        "kthread.h": "c",
+        "fs.h": "c",
+        "proc_fs.h": "c",
+        "radix-tree.h": "c"
     }
 }

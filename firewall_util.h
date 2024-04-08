@@ -10,15 +10,18 @@
 #include <linux/tcp.h>
 #include <linux/udp.h>
 
-void read_config(void) {
+bool read_config(void) {
+    const char* config_file_name = "/.firewallconfig";
     struct file* file = filp_open("/.firewallconfig", O_RDONLY, 0);
     if (IS_ERR(file)) {
-        pr_info("%d\n", PTR_ERR(file));
+        pr_err("%d\n", PTR_ERR(file));
+        return false;
     }
     else {
         char buf[100];
         kernel_read(file, buf, 100, NULL);
         pr_info("%s\n", buf);
+        return true;
     }
 }
 

@@ -42,6 +42,10 @@
         "kthread.h": "c",
         "fs.h": "c",
         "proc_fs.h": "c",
-        "radix-tree.h": "c"
+        "radix-tree.h": "c",
+        "firewall_util.h": "c",
+        "chrono": "c",
+        "typeinfo": "c",
+        "list": "c"
     }
 }

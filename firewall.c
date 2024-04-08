@@ -12,7 +12,41 @@
 #include <linux/tcp.h>
 #include <linux/udp.h>
 #include <linux/proc_fs.h> 
+#include <linux/list.h>
 #include "firewall_util.h"
+
+struct ip_address_node {
+	struct list_head list;
+	int ip_address;
+};
+
+struct firewall_config {
+	struct list_head ip_address_list_head;
+};
+
+void add_ip_address(struct firewall_config* config, int ip_address) {
+	pr_info("about to run struct ip_address_node* new_node = kmalloc(sizeof(struct ip_address_node), GFP_KERNEL);");
+	struct ip_address_node* new_node = kmalloc(sizeof(struct ip_address_node), GFP_KERNEL);
+	if (!new_node) {
+		return;
+	}
+	pr_info("about to run new_node->ip_address = ip_address;");
+	new_node->ip_address = ip_address;
+	INIT_LIST_HEAD(&new_node->list);
+	pr_info("about to run 	list_add(&config->ip_address_list_head, &new_node->list);");
+	pr_info("&config->ip_address_list_head = %d, &new_node->list = %d", &config->ip_address_list_head,  &new_node->list);
+	list_add(&config->ip_address_list_head, &new_node->list);
+}
+
+void print_ip_addresses(struct firewall_config* config) {
+	// TODO
+}
+
+struct firewall_config* init_config(void) {
+	struct firewall_config* config = kmalloc(sizeof(struct firewall_config), GFP_KERNEL);
+	INIT_LIST_HEAD(&config->ip_address_list_head);
+	return config;
+}
 
 static struct nf_hook_ops *nfho = NULL;
 
@@ -62,6 +96,11 @@ static const struct proc_ops proc_file_fops = {
 static int __init LKM_init(void)
 {
     read_config();
+	struct firewall_config* config = init_config();
+	add_ip_address(config, 10);
+	add_ip_address(config, 11);
+	add_ip_address(config, 12);
+	print_ip_addresses(config);
 	nfho = (struct nf_hook_ops*)kcalloc(1, sizeof(struct nf_hook_ops), GFP_KERNEL);
 	
 	/* Initialize netfilter hook */

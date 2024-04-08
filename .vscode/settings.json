@@ -46,6 +46,8 @@
         "firewall_util.h": "c",
         "chrono": "c",
         "typeinfo": "c",
-        "list": "c"
+        "list": "c",
+        "iosfwd": "cpp",
+        "iomanip": "cpp"
     }
 }

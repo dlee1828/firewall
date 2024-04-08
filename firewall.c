@@ -13,7 +13,23 @@
 #include <linux/udp.h>
 #include <linux/proc_fs.h> 
 #include <linux/list.h>
-#include "firewall_util.h"
+
+unsigned int ip_to_int(const char *ip) {
+    unsigned int result = 0;
+    unsigned int part = 0;
+    while (*ip) {
+        if (*ip == '.') {
+            result = (result << 8) + part;
+            part = 0;
+        } else {
+            part = part * 10 + (*ip - '0');
+        }
+        ip++;
+    }
+    result = (result << 8) + part;
+
+    return result;
+}
 
 struct ip_address_node {
 	struct list_head list;
@@ -24,29 +40,38 @@ struct firewall_config {
 	struct list_head ip_address_list_head;
 };
 
-void add_ip_address(struct firewall_config* config, int ip_address) {
-	pr_info("about to run struct ip_address_node* new_node = kmalloc(sizeof(struct ip_address_node), GFP_KERNEL);");
+static struct firewall_config* config = NULL;
+
+void init_config(void) {
+	config = kmalloc(sizeof(struct firewall_config), GFP_KERNEL);
+	INIT_LIST_HEAD(&config->ip_address_list_head);
+}
+
+void add_ip_address_to_config(int ip_address) {
 	struct ip_address_node* new_node = kmalloc(sizeof(struct ip_address_node), GFP_KERNEL);
 	if (!new_node) {
+		pr_err("Could not allocate memory for new ip address node\n");
 		return;
 	}
-	pr_info("about to run new_node->ip_address = ip_address;");
 	new_node->ip_address = ip_address;
-	INIT_LIST_HEAD(&new_node->list);
-	pr_info("about to run 	list_add(&config->ip_address_list_head, &new_node->list);");
-	pr_info("&config->ip_address_list_head = %d, &new_node->list = %d", &config->ip_address_list_head,  &new_node->list);
-	list_add(&config->ip_address_list_head, &new_node->list);
+	list_add(&new_node->list, &config->ip_address_list_head);
 }
 
-void print_ip_addresses(struct firewall_config* config) {
-	// TODO
+bool load_config(void) {
+    const char* config_file_name = "/.firewallconfig";
+    struct file* file = filp_open("/.firewallconfig", O_RDONLY, 0);
+    if (IS_ERR(file)) {
+        pr_err("%d\n", PTR_ERR(file));
+        return false;
+    }
+    else {
+        char buf[100];
+        kernel_read(file, buf, 100, NULL);
+        pr_info("%s\n", buf);
+        return true;
+    }
 }
 
-struct firewall_config* init_config(void) {
-	struct firewall_config* config = kmalloc(sizeof(struct firewall_config), GFP_KERNEL);
-	INIT_LIST_HEAD(&config->ip_address_list_head);
-	return config;
-}
 
 static struct nf_hook_ops *nfho = NULL;
 
@@ -63,6 +88,11 @@ static unsigned int hfunc(void *priv, struct sk_buff *skb, const struct nf_hook_
 	const char* blocked_ip_address = "17.253.144.10";
 
 	int source_ip_address = ntohl(iph->addrs.saddr);
+
+	struct list_head* cur = NULL;
+	list_for_each(cur, &config->ip_address_list_head) {
+		struct ip_address_node* node = list_entry(cur, struct ip_address_node, list);
+	}
 	
 	// if (source_ip_address == ip_to_int(blocked_ip_address)) {
 	// 	pr_info("DROPPED A PACKET FROM IP ADDRESS %s\n", blocked_ip_address);
@@ -75,10 +105,10 @@ static unsigned int hfunc(void *priv, struct sk_buff *skb, const struct nf_hook_
 	if (iph->protocol == IPPROTO_UDP) {
 		udph = udp_hdr(skb);
         if (udph->dest != 43426) {
-            pr_info("Received UDP packet destined for port %d\n", udph->dest);
+            // pr_info("Received UDP packet destined for port %d\n", udph->dest);
         }
 		if (ntohs(udph->dest) == 53) {
-            pr_info("Received DNS packet with contents\n");
+            // pr_info("Received DNS packet with contents\n");
 			return NF_ACCEPT;
 		}
 	}
@@ -95,12 +125,14 @@ static const struct proc_ops proc_file_fops = {
 
 static int __init LKM_init(void)
 {
-    read_config();
+	init_config();
+    load_config();
 	struct firewall_config* config = init_config();
-	add_ip_address(config, 10);
-	add_ip_address(config, 11);
-	add_ip_address(config, 12);
-	print_ip_addresses(config);
+	add_ip_address_to_config(config, 10);
+	add_ip_address_to_config(config, 11);
+	add_ip_address_to_config(config, 12);
+	add_ip_address_to_config(config, 13);
+	add_ip_address_to_config(config, 14);
 	nfho = (struct nf_hook_ops*)kcalloc(1, sizeof(struct nf_hook_ops), GFP_KERNEL);
 	
 	/* Initialize netfilter hook */

@@ -65,10 +65,31 @@ void reset_ip_address_list(void) {
 	}
 }
 
+static ssize_t sysfs_show(struct kobject *kobj, 
+                struct kobj_attribute *attr, char *buf)
+{
+	return 0;
+}
+static ssize_t sysfs_store(struct kobject *kobj, 
+                struct kobj_attribute *attr,const char *buf, size_t count)
+{
+	return 0;
+}
+
 void reload_config(void) {
 	reset_ip_address_list();
 	struct kobject *kobj_ref;
-	kobj_ref = kobject_create_and_add("daniel",kernel_kobj);	
+	kobj_ref = kobject_create_and_add("daniel2",kernel_kobj);	
+
+	int daniel_value = 100;
+
+	struct kobj_attribute etx_attr = __ATTR(daniel_value, 0660, sysfs_show, sysfs_store);
+	if(sysfs_create_file(kobj_ref, &etx_attr.attr)){
+    	printk(KERN_INFO"Cannot create sysfs file......\n");
+		return;
+	} else {
+		pr_info("Successfully created sysfs file.....\n");
+	}
 
 	return;
     const char* config_file_name = CONFIG_FILE_PATH;

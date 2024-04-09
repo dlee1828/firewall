@@ -48,6 +48,7 @@
         "typeinfo": "c",
         "list": "c",
         "iosfwd": "cpp",
-        "iomanip": "cpp"
+        "iomanip": "cpp",
+        "iostream": "cpp"
     }
 }

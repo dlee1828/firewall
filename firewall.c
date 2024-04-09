@@ -14,7 +14,10 @@
 #include <linux/proc_fs.h> 
 #include <linux/list.h>
 
-unsigned int ip_to_int(const char *ip) {
+#define CONFIG_FILE_PATH "/.firewallconfig"
+#define READ_BUFFER_SIZE 1000
+
+unsigned int ip_to_int(char *ip) {
     unsigned int result = 0;
     unsigned int part = 0;
     while (*ip) {
@@ -33,7 +36,7 @@ unsigned int ip_to_int(const char *ip) {
 
 struct ip_address_node {
 	struct list_head list;
-	int ip_address;
+	int ip_address; // big endian
 };
 
 struct firewall_config {
@@ -58,20 +61,42 @@ void add_ip_address_to_config(int ip_address) {
 }
 
 bool load_config(void) {
-    const char* config_file_name = "/.firewallconfig";
-    struct file* file = filp_open("/.firewallconfig", O_RDONLY, 0);
+    const char* config_file_name = CONFIG_FILE_PATH;
+    struct file* file = filp_open(CONFIG_FILE_PATH, O_RDONLY, 0);
     if (IS_ERR(file)) {
         pr_err("%d\n", PTR_ERR(file));
         return false;
     }
     else {
-        char buf[100];
-        kernel_read(file, buf, 100, NULL);
+        char buf[READ_BUFFER_SIZE];
+        kernel_read(file, buf, READ_BUFFER_SIZE, NULL);
         pr_info("%s\n", buf);
+
+		char ip_address_line[16];
+		int line_index = 0;
+		for (int i = 0; i < READ_BUFFER_SIZE; i++) {
+			if (buf[i] == '\0') break;
+			else if (buf[i] == '\n') {
+				ip_address_line[line_index] = "\0";
+				add_ip_address_to_config(ip_to_int(ip_address_line));
+				line_index = 0;
+			}
+			else {
+				ip_address_line[line_index] = buf[i];
+				line_index++;
+			}
+		}
+
+		// pr_info("Ip addresses retrieved:\n");
+		// struct list_head* cur;
+		// list_for_each(cur, &config->ip_address_list_head) {
+		// 	struct ip_address_node* node = list_entry(cur, struct ip_address_node, list);
+		// 	pr_info("%d\n", node->ip_address);
+		// }
+
         return true;
     }
 }
-
 
 static struct nf_hook_ops *nfho = NULL;
 
@@ -127,12 +152,6 @@ static int __init LKM_init(void)
 {
 	init_config();
     load_config();
-	struct firewall_config* config = init_config();
-	add_ip_address_to_config(config, 10);
-	add_ip_address_to_config(config, 11);
-	add_ip_address_to_config(config, 12);
-	add_ip_address_to_config(config, 13);
-	add_ip_address_to_config(config, 14);
 	nfho = (struct nf_hook_ops*)kcalloc(1, sizeof(struct nf_hook_ops), GFP_KERNEL);
 	
 	/* Initialize netfilter hook */

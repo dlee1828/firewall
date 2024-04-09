@@ -1,8 +1,3 @@
-/*****************************************************
- * This code was compiled and tested on Ubuntu 18.04.1
- * with kernel version 4.15.0
- *****************************************************/
-
 #include <linux/init.h>
 #include <linux/module.h>
 #include <linux/kernel.h>
@@ -60,17 +55,32 @@ void add_ip_address_to_config(int ip_address) {
 	list_add(&new_node->list, &config->ip_address_list_head);
 }
 
-bool load_config(void) {
+void reset_ip_address_list(void) {
+	struct list_head* cur;
+	struct list_head* tmp;
+	list_for_each_safe(cur, tmp, &config->ip_address_list_head){
+         struct ip_address_node* entry = list_entry(cur, struct ip_address_node, list);
+         list_del(cur);
+         kfree(entry);
+	}
+}
+
+void reload_config(void) {
+	reset_ip_address_list();
+	struct kobject *kobj_ref;
+	kobj_ref = kobject_create_and_add("daniel",kernel_kobj);	
+
+	return;
     const char* config_file_name = CONFIG_FILE_PATH;
     struct file* file = filp_open(CONFIG_FILE_PATH, O_RDONLY, 0);
     if (IS_ERR(file)) {
-        pr_err("%d\n", PTR_ERR(file));
-        return false;
+		pr_warn("Couldn't open config file\n");
+    	pr_warn("%d\n", PTR_ERR(file));
     }
     else {
+		pr_info("Successfully opened file");
         char buf[READ_BUFFER_SIZE];
         kernel_read(file, buf, READ_BUFFER_SIZE, NULL);
-        pr_info("%s\n", buf);
 
 		char ip_address_line[16];
 		int line_index = 0;
@@ -87,14 +97,7 @@ bool load_config(void) {
 			}
 		}
 
-		// pr_info("Ip addresses retrieved:\n");
-		// struct list_head* cur;
-		// list_for_each(cur, &config->ip_address_list_head) {
-		// 	struct ip_address_node* node = list_entry(cur, struct ip_address_node, list);
-		// 	pr_info("%d\n", node->ip_address);
-		// }
-
-        return true;
+		filp_close(file, NULL);
     }
 }
 
@@ -102,6 +105,11 @@ static struct nf_hook_ops *nfho = NULL;
 
 static unsigned int hfunc(void *priv, struct sk_buff *skb, const struct nf_hook_state *state)
 {
+	// bool config_loaded = reload_config();
+	// if (!config_loaded) {
+	// 	return NF_ACCEPT;
+	// }	
+
 	skb->head;
 	struct iphdr *iph;
 	struct udphdr *udph;
@@ -110,36 +118,44 @@ static unsigned int hfunc(void *priv, struct sk_buff *skb, const struct nf_hook_
 
 	iph = ip_hdr(skb);
 
-	const char* blocked_ip_address = "17.253.144.10";
+	unsigned int source_ip_address = ntohl(iph->addrs.saddr);
 
-	int source_ip_address = ntohl(iph->addrs.saddr);
+	const char* target = "142.250.114.113";
 
-	struct list_head* cur = NULL;
+	bool ping = false;
+	if (source_ip_address == ip_to_int(target)) {
+		pr_info("Received packet from ping, source is %d, target is %d\n", source_ip_address, ip_to_int(target));
+		ping = true;
+	}
+
+	bool should_drop = false;
+	struct list_head* cur;
 	list_for_each(cur, &config->ip_address_list_head) {
 		struct ip_address_node* node = list_entry(cur, struct ip_address_node, list);
+		if (ping) {
+			pr_info("will block: %d\n", node->ip_address);
+		}
+		if (node->ip_address == source_ip_address) should_drop = true;
 	}
 	
-	// if (source_ip_address == ip_to_int(blocked_ip_address)) {
-	// 	pr_info("DROPPED A PACKET FROM IP ADDRESS %s\n", blocked_ip_address);
-	// 	pkt_hex_dump(skb);
-	// 	return NF_DROP;
+	if (should_drop) {
+		pr_info("DROPPED A PACKET FROM IP ADDRESS %s\n", source_ip_address);
+		return NF_DROP;
+	}
+
+	// if (iph->protocol == IPPROTO_UDP) {
+	// 	udph = udp_hdr(skb);
+    //     if (udph->dest != 43426) {
+    //         // pr_info("Received UDP packet destined for port %d\n", udph->dest);
+    //     }
+	// 	if (ntohs(udph->dest) == 53) {
+    //         // pr_info("Received DNS packet with contents\n");
+	// 		return NF_ACCEPT;
+	// 	}
 	// }
-
-    // pr_info("I'm here!\n");
-
-	if (iph->protocol == IPPROTO_UDP) {
-		udph = udp_hdr(skb);
-        if (udph->dest != 43426) {
-            // pr_info("Received UDP packet destined for port %d\n", udph->dest);
-        }
-		if (ntohs(udph->dest) == 53) {
-            // pr_info("Received DNS packet with contents\n");
-			return NF_ACCEPT;
-		}
-	}
-	else if (iph->protocol == IPPROTO_TCP) {
-		return NF_ACCEPT;
-	}
+	// else if (iph->protocol == IPPROTO_TCP) {
+	// 	return NF_ACCEPT;
+	// }
 	
 	return NF_ACCEPT;
 }
@@ -151,7 +167,7 @@ static const struct proc_ops proc_file_fops = {
 static int __init LKM_init(void)
 {
 	init_config();
-    load_config();
+	reload_config();
 	nfho = (struct nf_hook_ops*)kcalloc(1, sizeof(struct nf_hook_ops), GFP_KERNEL);
 	
 	/* Initialize netfilter hook */

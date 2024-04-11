@@ -77,8 +77,18 @@ bool validate_ip_address(std::string ip_address) {
     return true;
 }
 
+void test() {
+    std::ifstream file;
+    file.open("/sys/kernel/firewall-config/daniel_value2");
+    int x;
+    file >> x;
+    std::cout << x << std::endl;
+}
 
 int main(int argc, char* argv[]) {
+    test();
+    return 0;
+
     uid_t uid = getuid();
     if (argc == 2 && argv[1] == std::string("-l")) {
         std::ifstream config_file;

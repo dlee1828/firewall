@@ -18,7 +18,7 @@ build:
 	make -C /lib/modules/$(shell uname -r)/build M=$(PWD) modules
 
 clean:
-	sudo rmmod firewall
+	-sudo rmmod firewall
 	make -C /lib/modules/$(shell uname -r)/build M=$(PWD) clean
 
 load: build

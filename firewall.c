@@ -65,25 +65,36 @@ void reset_ip_address_list(void) {
 	}
 }
 
+volatile int value = 100;
+
 static ssize_t sysfs_show(struct kobject *kobj, 
                 struct kobj_attribute *attr, char *buf)
 {
-	return 0;
+	pr_info("Sysfs - Read!!!\n");
+    return sprintf(buf, "%d", value);
 }
 static ssize_t sysfs_store(struct kobject *kobj, 
                 struct kobj_attribute *attr,const char *buf, size_t count)
 {
-	return 0;
+	pr_info("Sysfs - Write!!!\n");
+    sscanf(buf,"%d",&value);
+	return count;
 }
 
+struct kobj_attribute etx_attr = __ATTR(value, 0664, sysfs_show, sysfs_store);
+static struct kobject *kobj_ref;
 void reload_config(void) {
-	reset_ip_address_list();
-	struct kobject *kobj_ref;
-	kobj_ref = kobject_create_and_add("daniel2",kernel_kobj);	
+	// reset_ip_address_list();
 
-	int daniel_value = 100;
+	// struct kobj_type type = {
+	// 	.get_ownership
+	// }
 
-	struct kobj_attribute etx_attr = __ATTR(daniel_value, 0660, sysfs_show, sysfs_store);
+	// kobj_ref = kobject_create_and_add("daniel",kernel_kobj);	
+	kobj_ref = kobject_create_and_add("firewall-config", kernel_kobj);	
+
+
+
 	if(sysfs_create_file(kobj_ref, &etx_attr.attr)){
     	printk(KERN_INFO"Cannot create sysfs file......\n");
 		return;
@@ -126,6 +137,8 @@ static struct nf_hook_ops *nfho = NULL;
 
 static unsigned int hfunc(void *priv, struct sk_buff *skb, const struct nf_hook_state *state)
 {
+	return NF_ACCEPT;
+
 	// bool config_loaded = reload_config();
 	// if (!config_loaded) {
 	// 	return NF_ACCEPT;
@@ -204,8 +217,14 @@ static int __init LKM_init(void)
 
 static void __exit LKM_exit(void)
 {
+	pr_info("Unregistering net hook");
 	nf_unregister_net_hook(&init_net, nfho);
+	pr_info("Freeing nfho");
 	kfree(nfho);
+	pr_info("Freeing config");
+	kfree(config);
+	pr_info("Freeing kobj_ref");
+	kobject_put(kobj_ref);
 }
 
 module_init(LKM_init);

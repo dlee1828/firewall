@@ -65,36 +65,56 @@ void reset_ip_address_list(void) {
 	}
 }
 
-volatile int value = 100;
+int value = 11;
+
+volatile int apple = 99; // -978976393 // -978976393
+volatile int banana = 101;
+volatile int cherry = 102;
+volatile int durian = 200;
 
 static ssize_t sysfs_show(struct kobject *kobj, 
                 struct kobj_attribute *attr, char *buf)
 {
-	pr_info("Sysfs - Read!!!\n");
-    return sprintf(buf, "%d", value);
+	pr_info("sysfs_show for attr name = %s\n", attr->attr.name);
+    return sprintf(buf, "%d", banana);
 }
 static ssize_t sysfs_store(struct kobject *kobj, 
                 struct kobj_attribute *attr,const char *buf, size_t count)
 {
 	pr_info("Sysfs - Write!!!\n");
-    sscanf(buf,"%d",&value);
+    sscanf(buf,"%s", &banana);
 	return count;
 }
 
-struct kobj_attribute etx_attr = __ATTR(value, 0664, sysfs_show, sysfs_store);
+static struct kobj_attribute etx_attr = __ATTR(value, 0664, sysfs_show, sysfs_store);
 static struct kobject *kobj_ref;
+static struct attribute_group* ag;
+static struct kobj_attribute a1 = __ATTR(apple, 0664, sysfs_show, sysfs_store);
+static struct kobj_attribute a2 = __ATTR(banana, 0664, sysfs_show, sysfs_store);
+static struct kobj_attribute a3 = __ATTR(cherry, 0664, sysfs_show, sysfs_store);
+static struct kobj_attribute a4 = __ATTR(durian, 0664, sysfs_show, sysfs_store);
+static struct attribute* attribute_array[] = {&a1.attr, &a2.attr, &a3.attr, &a4.attr, NULL};
+
 void reload_config(void) {
-	// reset_ip_address_list();
+	ag = kmalloc(sizeof (struct attribute_group), GFP_KERNEL);
+	ag->name = "My group";
+	ag->attrs = attribute_array;
+	pr_info("just assigned to ag->attrs");
 
-	// struct kobj_type type = {
-	// 	.get_ownership
-	// }
-
-	// kobj_ref = kobject_create_and_add("daniel",kernel_kobj);	
 	kobj_ref = kobject_create_and_add("firewall-config", kernel_kobj);	
 
+	pr_info("about to create group");
+	if(sysfs_create_group(kobj_ref, ag)) {
+    	printk(KERN_INFO"Cannot create sysfs group...");
+		return;
+	} else {
+		pr_info("Successfully created sysfs group.....\n");
+	}
+ 
 
+	pr_info("Memory address of durian: %d\n", &durian);
 
+	return;
 	if(sysfs_create_file(kobj_ref, &etx_attr.attr)){
     	printk(KERN_INFO"Cannot create sysfs file......\n");
 		return;
@@ -223,6 +243,7 @@ static void __exit LKM_exit(void)
 	kfree(nfho);
 	pr_info("Freeing config");
 	kfree(config);
+	kfree(ag);
 	pr_info("Freeing kobj_ref");
 	kobject_put(kobj_ref);
 }

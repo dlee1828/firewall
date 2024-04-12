@@ -78,10 +78,55 @@ static ssize_t sysfs_show(struct kobject *kobj,
 	pr_info("sysfs_show for attr name = %s\n", attr->attr.name);
     return sprintf(buf, "%d", banana);
 }
+
+bool char_is_digit(char c) {
+	return '0' <= c && c <= '9';
+}
+
+int digits_to_value(char* digits, int len) {
+	return 10;
+}
+
 static ssize_t sysfs_store(struct kobject *kobj, 
                 struct kobj_attribute *attr,const char *buf, size_t count)
 {
-    sscanf(buf,"%d", &banana);
+	int values[10] = {0};
+	int values_i = 0;
+
+	char digits[20];
+	int digits_i= 0;
+	for (int i = 0; *(buf + i) != NULL; i++) {
+		char c = *buf;
+		if (char_is_digit(c)) {
+			digits[digits_i] = c;
+			digits_i++;
+		}
+		else {
+			// convert digits to a value
+			if (digits_i > 0) {
+				values[values_i] = digits_to_value(digits, digits_i);
+				values_i++;
+			}
+			digits_i = 0;
+		}
+	}
+	// May need to add last one
+	if (digits_i > 0) {
+		values[values_i] = digits_to_value(digits, digits_i);
+	}
+
+	// int total_bytes = 0;
+	// for (int i = 0; i < 10; i++) {
+	// 	int sscanf_result = sscanf(buf + total_bytes, "%d", &array[i]);
+	// 	if (sscanf_result == -1) break;
+	// 	total_bytes += sscanf_result * sizeof(int);
+	// }
+
+	// pr_info("Value of array:\n");
+	// for (int i = 0; i < 10; i++) {
+	// 	pr_info("%d\n", array[i]);
+	// }
+
 	return count;
 }
 

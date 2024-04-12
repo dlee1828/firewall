@@ -81,8 +81,7 @@ static ssize_t sysfs_show(struct kobject *kobj,
 static ssize_t sysfs_store(struct kobject *kobj, 
                 struct kobj_attribute *attr,const char *buf, size_t count)
 {
-	pr_info("Sysfs - Write!!!\n");
-    sscanf(buf,"%s", &banana);
+    sscanf(buf,"%d", &banana);
 	return count;
 }
 

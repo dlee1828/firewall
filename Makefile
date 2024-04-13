@@ -1,5 +1,4 @@
 obj-m += firewall.o
-# obj-m += proc-example.o
 
 firewall-module-objs := firewall.o util.o
 

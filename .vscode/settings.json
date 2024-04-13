@@ -106,6 +106,8 @@
         "cinttypes": "c",
         "cstdbool": "c",
         "variant": "c",
-        "version": "c"
+        "version": "c",
+        "device.h": "c",
+        "barrier.h": "c"
     }
 }

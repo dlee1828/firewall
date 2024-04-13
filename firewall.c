@@ -29,148 +29,82 @@ unsigned int ip_to_int(char *ip) {
     return result;
 }
 
-struct ip_address_node {
-	struct list_head list;
-	int ip_address; // big endian
-};
+#define MAX_IP_ADDRESSES 100
 
-struct firewall_config {
-	struct list_head ip_address_list_head;
-};
-
-static struct firewall_config* config = NULL;
-
-void init_config(void) {
-	config = kmalloc(sizeof(struct firewall_config), GFP_KERNEL);
-	INIT_LIST_HEAD(&config->ip_address_list_head);
-}
-
-void add_ip_address_to_config(int ip_address) {
-	struct ip_address_node* new_node = kmalloc(sizeof(struct ip_address_node), GFP_KERNEL);
-	if (!new_node) {
-		pr_err("Could not allocate memory for new ip address node\n");
-		return;
-	}
-	new_node->ip_address = ip_address;
-	list_add(&new_node->list, &config->ip_address_list_head);
-}
-
-void reset_ip_address_list(void) {
-	struct list_head* cur;
-	struct list_head* tmp;
-	list_for_each_safe(cur, tmp, &config->ip_address_list_head){
-         struct ip_address_node* entry = list_entry(cur, struct ip_address_node, list);
-         list_del(cur);
-         kfree(entry);
-	}
-}
-
-int value = 11;
-
-volatile int apple = 99; // -978976393 // -978976393
-volatile int banana = 101;
-volatile int cherry = 102;
-volatile int durian = 200;
+volatile int* ip_addresses[MAX_IP_ADDRESSES] = {0};
 
 static ssize_t sysfs_show(struct kobject *kobj, 
                 struct kobj_attribute *attr, char *buf)
 {
-	pr_info("sysfs_show for attr name = %s\n", attr->attr.name);
-    return sprintf(buf, "%d", banana);
+	int total_bytes_written = 0;
+	for (int i = 0; i < MAX_IP_ADDRESSES && ip_addresses[i] != 0; i++) {
+    	int written = sprintf((buf + total_bytes_written), "%d\n", ip_addresses[i]);
+		total_bytes_written += written;
+	}
+	return total_bytes_written;
 }
 
 static ssize_t sysfs_store(struct kobject *kobj, 
                 struct kobj_attribute *attr,const char *buf, size_t count)
 {
-	int values[10] = {0};
 	int index = 0;
-	while(sscanf(buf, "%d", &values[index]) == 1) {
+	while(index < MAX_IP_ADDRESSES && sscanf(buf, "%d", &ip_addresses[index]) == 1) {
 		while (*buf != '\n' && *buf != '\0') buf++;
 		if (*buf == '\n') buf++;
 		index++;
 	}
 
-	pr_info("Value of array:\n");
-	for (int i = 0; i < 10; i++) {
-		pr_info("%d\n", values[i]);
-	}
-
-	// int total_bytes = 0;
-	// for (int i = 0; i < 10; i++) {
-	// 	int sscanf_result = sscanf(buf + total_bytes, "%d", &array[i]);
-	// 	if (sscanf_result == -1) break;
-	// 	total_bytes += sscanf_result * sizeof(int);
-	// }
-
-
 	return count;
 }
 
-static struct kobj_attribute etx_attr = __ATTR(value, 0664, sysfs_show, sysfs_store);
 static struct kobject *kobj_ref;
 static struct attribute_group* ag;
-static struct kobj_attribute a1 = __ATTR(apple, 0664, sysfs_show, sysfs_store);
-static struct kobj_attribute a2 = __ATTR(banana, 0664, sysfs_show, sysfs_store);
-static struct kobj_attribute a3 = __ATTR(cherry, 0664, sysfs_show, sysfs_store);
-static struct kobj_attribute a4 = __ATTR(durian, 0664, sysfs_show, sysfs_store);
-static struct attribute* attribute_array[] = {&a1.attr, &a2.attr, &a3.attr, &a4.attr, NULL};
+static struct kobj_attribute a1 = __ATTR(ip_addresses, 0664, sysfs_show, sysfs_store);
+static struct attribute* attribute_array[] = {&a1.attr, NULL};
 
 void reload_config(void) {
 	ag = kmalloc(sizeof (struct attribute_group), GFP_KERNEL);
-	ag->name = "My group";
+	ag->name = "group";
 	ag->attrs = attribute_array;
-	pr_info("just assigned to ag->attrs");
-
 	kobj_ref = kobject_create_and_add("firewall-config", kernel_kobj);	
 
-	pr_info("about to create group");
 	if(sysfs_create_group(kobj_ref, ag)) {
     	printk(KERN_INFO"Cannot create sysfs group...");
 		return;
 	} else {
 		pr_info("Successfully created sysfs group.....\n");
 	}
- 
-
-	pr_info("Memory address of durian: %d\n", &durian);
 
 	return;
-	if(sysfs_create_file(kobj_ref, &etx_attr.attr)){
-    	printk(KERN_INFO"Cannot create sysfs file......\n");
-		return;
-	} else {
-		pr_info("Successfully created sysfs file.....\n");
-	}
 
-	return;
-    const char* config_file_name = CONFIG_FILE_PATH;
-    struct file* file = filp_open(CONFIG_FILE_PATH, O_RDONLY, 0);
-    if (IS_ERR(file)) {
-		pr_warn("Couldn't open config file\n");
-    	pr_warn("%d\n", PTR_ERR(file));
-    }
-    else {
-		pr_info("Successfully opened file");
-        char buf[READ_BUFFER_SIZE];
-        kernel_read(file, buf, READ_BUFFER_SIZE, NULL);
+    // const char* config_file_name = CONFIG_FILE_PATH;
+    // struct file* file = filp_open(CONFIG_FILE_PATH, O_RDONLY, 0);
+    // if (IS_ERR(file)) {
+	// 	pr_warn("Couldn't open config file\n");
+    // 	pr_warn("%d\n", PTR_ERR(file));
+    // }
+    // else {
+	// 	pr_info("Successfully opened file");
+    //     char buf[READ_BUFFER_SIZE];
+    //     kernel_read(file, buf, READ_BUFFER_SIZE, NULL);
 
-		char ip_address_line[16];
-		int line_index = 0;
-		for (int i = 0; i < READ_BUFFER_SIZE; i++) {
-			if (buf[i] == '\0') break;
-			else if (buf[i] == '\n') {
-				ip_address_line[line_index] = "\0";
-				add_ip_address_to_config(ip_to_int(ip_address_line));
-				line_index = 0;
-			}
-			else {
-				ip_address_line[line_index] = buf[i];
-				line_index++;
-			}
-		}
+	// 	char ip_address_line[16];
+	// 	int line_index = 0;
+	// 	for (int i = 0; i < READ_BUFFER_SIZE; i++) {
+	// 		if (buf[i] == '\0') break;
+	// 		else if (buf[i] == '\n') {
+	// 			ip_address_line[line_index] = "\0";
+	// 			add_ip_address_to_config(ip_to_int(ip_address_line));
+	// 			line_index = 0;
+	// 		}
+	// 		else {
+	// 			ip_address_line[line_index] = buf[i];
+	// 			line_index++;
+	// 		}
+	// 	}
 
-		filp_close(file, NULL);
-    }
+	// 	filp_close(file, NULL);
+    // }
 }
 
 static struct nf_hook_ops *nfho = NULL;
@@ -203,15 +137,6 @@ static unsigned int hfunc(void *priv, struct sk_buff *skb, const struct nf_hook_
 	}
 
 	bool should_drop = false;
-	struct list_head* cur;
-	list_for_each(cur, &config->ip_address_list_head) {
-		struct ip_address_node* node = list_entry(cur, struct ip_address_node, list);
-		if (ping) {
-			pr_info("will block: %d\n", node->ip_address);
-		}
-		if (node->ip_address == source_ip_address) should_drop = true;
-	}
-	
 	if (should_drop) {
 		pr_info("DROPPED A PACKET FROM IP ADDRESS %s\n", source_ip_address);
 		return NF_DROP;
@@ -240,7 +165,6 @@ static const struct proc_ops proc_file_fops = {
 
 static int __init LKM_init(void)
 {
-	init_config();
 	reload_config();
 	nfho = (struct nf_hook_ops*)kcalloc(1, sizeof(struct nf_hook_ops), GFP_KERNEL);
 	
@@ -262,7 +186,6 @@ static void __exit LKM_exit(void)
 	pr_info("Freeing nfho");
 	kfree(nfho);
 	pr_info("Freeing config");
-	kfree(config);
 	kfree(ag);
 	pr_info("Freeing kobj_ref");
 	kobject_put(kobj_ref);

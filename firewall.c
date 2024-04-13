@@ -9,10 +9,9 @@
 #include <linux/proc_fs.h> 
 #include <linux/list.h>
 
-#define CONFIG_FILE_PATH "/.firewallconfig"
 #define READ_BUFFER_SIZE 1000
 
-unsigned int ip_to_int(char *ip) {
+uint ip_to_int(char *ip) {
     unsigned int result = 0;
     unsigned int part = 0;
     while (*ip) {
@@ -31,28 +30,51 @@ unsigned int ip_to_int(char *ip) {
 
 #define MAX_IP_ADDRESSES 100
 
-volatile int* ip_addresses[MAX_IP_ADDRESSES] = {0};
+volatile int num_ip_addresses = 0;
+volatile uint* ip_addresses[MAX_IP_ADDRESSES];
 
 static ssize_t sysfs_show(struct kobject *kobj, 
                 struct kobj_attribute *attr, char *buf)
 {
 	int total_bytes_written = 0;
-	for (int i = 0; i < MAX_IP_ADDRESSES && ip_addresses[i] != 0; i++) {
-    	int written = sprintf((buf + total_bytes_written), "%d\n", ip_addresses[i]);
+	for (int i = 0; i < num_ip_addresses; i++) {
+    	int written = sprintf((buf + total_bytes_written), "%u\n", ip_addresses[i]);
 		total_bytes_written += written;
 	}
 	return total_bytes_written;
 }
 
+void delete_ip_address(uint ip_address) {
+	for (int i = 0; i < num_ip_addresses; i++) {
+		if (ip_addresses[i] == ip_address) {
+			ip_addresses[i] = ip_addresses[num_ip_addresses - 1];	
+			num_ip_addresses--;
+			break;
+		}
+	}
+}
+
 static ssize_t sysfs_store(struct kobject *kobj, 
                 struct kobj_attribute *attr,const char *buf, size_t count)
 {
-	int index = 0;
-	while(index < MAX_IP_ADDRESSES && sscanf(buf, "%d", &ip_addresses[index]) == 1) {
+	// Check for deletion
+	char c = '0';
+	sscanf(buf, "%c", &c);
+	if (c == 'D') {
+		buf++;
+		uint to_delete;
+		sscanf(buf, "%u", &to_delete);
+		delete_ip_address(to_delete);
+		return count;
+	}
+
+	int added = 0;
+	for (int i = num_ip_addresses; i < MAX_IP_ADDRESSES && sscanf(buf, "%u", &ip_addresses[i]) == 1; i++) {
 		while (*buf != '\n' && *buf != '\0') buf++;
 		if (*buf == '\n') buf++;
-		index++;
+		added++;
 	}
+	num_ip_addresses += added;
 
 	return count;
 }
@@ -66,7 +88,7 @@ void reload_config(void) {
 	ag = kmalloc(sizeof (struct attribute_group), GFP_KERNEL);
 	ag->name = "group";
 	ag->attrs = attribute_array;
-	kobj_ref = kobject_create_and_add("firewall-config", kernel_kobj);	
+	kobj_ref = kobject_create_and_add("firewall_config", kernel_kobj);	
 
 	if(sysfs_create_group(kobj_ref, ag)) {
     	printk(KERN_INFO"Cannot create sysfs group...");

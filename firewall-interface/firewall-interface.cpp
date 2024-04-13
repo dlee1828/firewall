@@ -4,12 +4,36 @@
 #include <iomanip>
 #include "unistd.h"
 
-#define CONFIG_FILE_PATH "/.firewallconfig"
+#define CONFIG_FILE_PATH "/sys/kernel/firewall_config/group/ip_addresses"
+
+uint ip_to_int(std::string ip_address) {
+    uint result = 0;
+    uint part = 0;
+    for (char c : ip_address) {
+        if (c == '.') {
+            result = (result << 8) + part;
+            part = 0;
+        } else {
+            part = part * 10 + (c - '0');
+        }
+    }
+    result = (result << 8) + part;
+
+    return result;
+}
+
+std::string int_to_ip(uint ip_int) {
+    std::string first = std::to_string((ip_int >> 24) & 0xFF);
+    std::string second = std::to_string((ip_int >> 16) & 0xFF);
+    std::string third = std::to_string((ip_int >> 8) & 0xFF);
+    std::string fourth = std::to_string(ip_int & 0xFF);
+    return first + "." + second + "." + third + "." + fourth;
+}
 
 void add_ip_address_to_config_file(std::string ip_address) {
     std::ofstream config_file;
     config_file.open(CONFIG_FILE_PATH, std::ios_base::openmode::_S_app);
-    config_file << ip_address << "\n";
+    config_file << ip_to_int(ip_address) << "\n";
     config_file.close();
 }
 
@@ -21,25 +45,11 @@ void print_string(std::string s) {
 }
 
 void remove_ip_address_from_config_file(std::string ip_address) {
-    std::string temp_file_name = std::string(CONFIG_FILE_PATH) + "_temp";
-
-    std::ifstream config_file;
+    std::ofstream config_file;
     config_file.open(CONFIG_FILE_PATH);
-
-    std::ofstream temp_file(temp_file_name);
-
-    std::string line;
-    while (getline(config_file, line)) {
-        if (line != ip_address) {
-            temp_file << line << "\n";
-        } 
-    }
-
+    config_file << "D";
+    config_file << ip_to_int(ip_address);
     config_file.close();
-    temp_file.close();
-
-    remove(CONFIG_FILE_PATH);
-    rename(temp_file_name.c_str(), CONFIG_FILE_PATH);
 }
 
 void print_usage() {
@@ -77,36 +87,26 @@ bool validate_ip_address(std::string ip_address) {
     return true;
 }
 
-void test() {
-    std::ifstream file;
-    file.open("/sys/kernel/firewall-config/daniel_value2");
-    int x;
-    file >> x;
-    std::cout << x << std::endl;
-}
-
 int main(int argc, char* argv[]) {
-    test();
-    return 0;
-
     uid_t uid = getuid();
     if (argc == 2 && argv[1] == std::string("-l")) {
         std::ifstream config_file;
         config_file.open(CONFIG_FILE_PATH);
         std::string line;
         while (getline(config_file, line)) {
-            std::cout << line << std::endl;
+            std::cout << int_to_ip(static_cast<uint>(std::stoi(line))) << std::endl;
         }
         config_file.close();
     }
     else if (argc == 3 && argv[1] == std::string("-a")) {
         if (uid != 0) {
             std::cout << "Root permissions are required to run this command.\n";
+            return 0;
         }
         std::string ip_address = argv[2];
         bool is_valid = validate_ip_address(ip_address);
         if (!is_valid) {
-            std::cout << "Invalid IPv4 IP Address";
+            std::cout << "Invalid IPv4 IP Address\n";
         } else {
             add_ip_address_to_config_file(ip_address);
         }

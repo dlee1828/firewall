@@ -10,6 +10,7 @@
 #include <linux/list.h>
 
 #define READ_BUFFER_SIZE 1000
+#define MAX_IP_ADDRESSES 100
 
 uint ip_to_int(char *ip) {
     unsigned int result = 0;
@@ -28,7 +29,16 @@ uint ip_to_int(char *ip) {
     return result;
 }
 
-#define MAX_IP_ADDRESSES 100
+char* int_to_ip(uint32_t ip_int) {
+    static char ip_str[16];
+    sprintf(ip_str, "%u.%u.%u.%u",
+        (ip_int >> 24) & 0xFF,
+        (ip_int >> 16) & 0xFF,
+        (ip_int >> 8) & 0xFF,
+        ip_int & 0xFF);
+    return ip_str;
+}
+
 
 volatile int num_ip_addresses = 0;
 volatile uint* ip_addresses[MAX_IP_ADDRESSES];
@@ -68,6 +78,7 @@ static ssize_t sysfs_store(struct kobject *kobj,
 		return count;
 	}
 
+	// Otherwise append ip addresses
 	int added = 0;
 	for (int i = num_ip_addresses; i < MAX_IP_ADDRESSES && sscanf(buf, "%u", &ip_addresses[i]) == 1; i++) {
 		while (*buf != '\n' && *buf != '\0') buf++;
@@ -84,7 +95,7 @@ static struct attribute_group* ag;
 static struct kobj_attribute a1 = __ATTR(ip_addresses, 0664, sysfs_show, sysfs_store);
 static struct attribute* attribute_array[] = {&a1.attr, NULL};
 
-void reload_config(void) {
+void init_config(void) {
 	ag = kmalloc(sizeof (struct attribute_group), GFP_KERNEL);
 	ag->name = "group";
 	ag->attrs = attribute_array;
@@ -96,53 +107,13 @@ void reload_config(void) {
 	} else {
 		pr_info("Successfully created sysfs group.....\n");
 	}
-
-	return;
-
-    // const char* config_file_name = CONFIG_FILE_PATH;
-    // struct file* file = filp_open(CONFIG_FILE_PATH, O_RDONLY, 0);
-    // if (IS_ERR(file)) {
-	// 	pr_warn("Couldn't open config file\n");
-    // 	pr_warn("%d\n", PTR_ERR(file));
-    // }
-    // else {
-	// 	pr_info("Successfully opened file");
-    //     char buf[READ_BUFFER_SIZE];
-    //     kernel_read(file, buf, READ_BUFFER_SIZE, NULL);
-
-	// 	char ip_address_line[16];
-	// 	int line_index = 0;
-	// 	for (int i = 0; i < READ_BUFFER_SIZE; i++) {
-	// 		if (buf[i] == '\0') break;
-	// 		else if (buf[i] == '\n') {
-	// 			ip_address_line[line_index] = "\0";
-	// 			add_ip_address_to_config(ip_to_int(ip_address_line));
-	// 			line_index = 0;
-	// 		}
-	// 		else {
-	// 			ip_address_line[line_index] = buf[i];
-	// 			line_index++;
-	// 		}
-	// 	}
-
-	// 	filp_close(file, NULL);
-    // }
 }
 
 static struct nf_hook_ops *nfho = NULL;
 
 static unsigned int hfunc(void *priv, struct sk_buff *skb, const struct nf_hook_state *state)
 {
-	return NF_ACCEPT;
-
-	// bool config_loaded = reload_config();
-	// if (!config_loaded) {
-	// 	return NF_ACCEPT;
-	// }	
-
-	skb->head;
 	struct iphdr *iph;
-	struct udphdr *udph;
 	if (!skb)
 		return NF_ACCEPT;
 
@@ -150,44 +121,25 @@ static unsigned int hfunc(void *priv, struct sk_buff *skb, const struct nf_hook_
 
 	unsigned int source_ip_address = ntohl(iph->addrs.saddr);
 
-	const char* target = "142.250.114.113";
-
-	bool ping = false;
-	if (source_ip_address == ip_to_int(target)) {
-		pr_info("Received packet from ping, source is %d, target is %d\n", source_ip_address, ip_to_int(target));
-		ping = true;
+	bool should_drop = false;
+	for (int i = 0; i < num_ip_addresses; i++) {
+		if (source_ip_address == ip_addresses[i]) {
+			should_drop = true;
+			break;
+		}
 	}
 
-	bool should_drop = false;
 	if (should_drop) {
-		pr_info("DROPPED A PACKET FROM IP ADDRESS %s\n", source_ip_address);
+		// pr_info("DROPPED A PACKET FROM IP ADDRESS %s\n", int_to_ip(source_ip_address));
 		return NF_DROP;
 	}
-
-	// if (iph->protocol == IPPROTO_UDP) {
-	// 	udph = udp_hdr(skb);
-    //     if (udph->dest != 43426) {
-    //         // pr_info("Received UDP packet destined for port %d\n", udph->dest);
-    //     }
-	// 	if (ntohs(udph->dest) == 53) {
-    //         // pr_info("Received DNS packet with contents\n");
-	// 		return NF_ACCEPT;
-	// 	}
-	// }
-	// else if (iph->protocol == IPPROTO_TCP) {
-	// 	return NF_ACCEPT;
-	// }
 	
 	return NF_ACCEPT;
 }
 
-static struct proc_dir_entry *proc_file; 
-static const struct proc_ops proc_file_fops = { 
-}; 
-
 static int __init LKM_init(void)
 {
-	reload_config();
+	init_config();
 	nfho = (struct nf_hook_ops*)kcalloc(1, sizeof(struct nf_hook_ops), GFP_KERNEL);
 	
 	/* Initialize netfilter hook */

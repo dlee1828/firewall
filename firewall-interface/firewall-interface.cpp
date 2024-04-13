@@ -94,7 +94,7 @@ int main(int argc, char* argv[]) {
         config_file.open(CONFIG_FILE_PATH);
         std::string line;
         while (getline(config_file, line)) {
-            std::cout << int_to_ip(static_cast<uint>(std::stoi(line))) << std::endl;
+            std::cout << int_to_ip(static_cast<uint>(std::stoul(line))) << std::endl;
         }
         config_file.close();
     }
@@ -113,6 +113,7 @@ int main(int argc, char* argv[]) {
     } else if (argc == 3 && argv[1] == std::string("-d")) {
         if (uid != 0) {
             std::cout << "Root permissions are required to run this command.\n";
+            return;
         }
         std::string ip_address = argv[2];
         bool is_valid = validate_ip_address(ip_address);

@@ -1,1 +1,0 @@
-cd /sys/kernel/firewall-config/'My group'
